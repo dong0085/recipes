@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# recipe — look up recipes stored as Markdown files next to this script.
+#
+#   recipe                  pick a recipe from a list
+#   recipe <name>           show a recipe (part of the name is enough)
+#   recipe new <name>       start a new recipe from the template
+#   recipe edit <name>      open a recipe in your editor
+#   recipe search <word>    find recipes that mention a word (e.g. an ingredient)
+#   recipe list             list every recipe
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+EDITOR="${EDITOR:-nano}"
+
+# "Banana Bread", "banana-bread.md", "recipes/banana-bread.md" -> "banana-bread"
+slug() {
+  echo "$*" | tr '[:upper:]' '[:lower:]' | sed -E 's#^.*/##; s/\.md$//; s/[^a-z0-9]+/-/g; s/^-|-$//g'
+}
+
+all_recipes() {
+  find "$DIR" -maxdepth 1 -name '*.md' ! -name 'README.md' -exec basename {} .md \; | sort
+}
+
+# Match glow's theme to macOS light/dark mode, which the terminal follows.
+theme() {
+  if defaults read -g AppleInterfaceStyle 2>/dev/null | grep -q Dark; then
+    echo dark
+  else
+    echo light
+  fi
+}
+
+show() {
+  if command -v glow >/dev/null && [[ -t 1 ]]; then
+    glow -p -s "$(theme)" "$DIR/$1.md"
+  elif command -v glow >/dev/null; then
+    glow -s "$(theme)" "$DIR/$1.md"
+  else
+    cat "$DIR/$1.md"
+  fi
+}
+
+# Turn what the user typed into one recipe name, or fail.
+find_recipe() {
+  local query matches count
+  query="$(slug "$@")"
+
+  if [[ -f "$DIR/$query.md" ]]; then
+    echo "$query"
+    return
+  fi
+
+  matches="$(all_recipes | grep -i -- "$query" || true)"
+  count="$(printf '%s' "$matches" | grep -c . || true)"
+
+  if [[ "$count" -eq 1 ]]; then
+    echo "$matches"
+  elif [[ "$count" -gt 1 ]] && command -v fzf >/dev/null && [[ -t 2 ]]; then
+    pick "$query"
+  elif [[ "$count" -gt 1 ]]; then
+    echo "Several recipes match \"$*\":" >&2
+    echo "$matches" | sed 's/^/  /' >&2
+    return 1
+  else
+    echo "No recipe matches \"$*\". Run 'recipe list' to see them all." >&2
+    return 1
+  fi
+}
+
+pick() {
+  local preview="cat $DIR/{}.md"
+  command -v glow >/dev/null && preview="glow -s $(theme) $DIR/{}.md"
+  all_recipes | fzf --query="${1:-}" --preview="$preview" --preview-window=right,65%
+}
+
+new_recipe() {
+  [[ $# -eq 0 ]] && { echo "Usage: recipe new <name>" >&2; exit 1; }
+  local name="$*" file
+  file="$DIR/$(slug "$name").md"
+  if [[ -f "$file" ]]; then
+    echo "That recipe already exists. Opening it." >&2
+  else
+    cat > "$file" <<EOF
+# $name
+
+Serves:
+Time:
+Source:
+Tags:
+
+## Ingredients
+
+-
+
+## Steps
+
+1.
+
+## Notes
+
+EOF
+  fi
+  "$EDITOR" "$file"
+}
+
+case "${1:-}" in
+  "")
+    if command -v fzf >/dev/null && [[ -t 1 ]]; then
+      name="$(pick)" && show "$name"
+    else
+      all_recipes
+    fi
+    ;;
+  list|ls)
+    all_recipes
+    ;;
+  new|add)
+    shift; new_recipe "$@"
+    ;;
+  edit)
+    shift; name="$(find_recipe "$@")" && "$EDITOR" "$DIR/$name.md"
+    ;;
+  search|find)
+    shift
+    [[ $# -eq 0 ]] && { echo "Usage: recipe search <word>" >&2; exit 1; }
+    grep -ril --include='*.md' --exclude='README.md' -- "$*" "$DIR" | xargs -n1 basename 2>/dev/null | sed 's/\.md$//' | sort
+    ;;
+  -h|--help|help)
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    name="$(find_recipe "$@")" && show "$name"
+    ;;
+esac

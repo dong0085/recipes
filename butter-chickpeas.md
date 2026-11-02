@@ -1,5 +1,7 @@
 # Butter Chickpeas
 
+Tags: indian, main, vegetarian, quick, one-pot
+
 Spices:
 - 4 tsp garam masala
 - 1 tsp paprika

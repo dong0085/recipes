@@ -1,5 +1,7 @@
 # Korean Cold Noodles
 
+Tags: korean, main, vegan, quick, cold
+
 Prep:
 - Noodles, cooked and cooled
 - Shredded cabbage

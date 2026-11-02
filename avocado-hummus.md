@@ -1,5 +1,7 @@
 # Avocado Hummus
 
+Tags: middle-eastern, dip, vegan, quick, no-cook
+
 ## Ingredients
 
 - 1 can chickpeas, 400 g / 15 oz, drained (about 240 g)

@@ -1,5 +1,7 @@
 # Chana Masala
 
+Tags: indian, main, vegan, one-pot
+
 1. Brown the onions.
 2. Add garlic and ginger.
 3. Add 1 tsp cumin, 1/2 tsp turmeric, and 1/2 tsp chili powder.

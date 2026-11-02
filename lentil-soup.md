@@ -1,5 +1,7 @@
 # Lentil Soup
 
+Tags: soup, vegan, one-pot, make-ahead
+
 1. Cook onion, celery, carrots, and salt in olive oil for 6–8 min, until soft.
 2. Add the spices and stir for 1 min:
    - 3 cloves garlic

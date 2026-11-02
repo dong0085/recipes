@@ -18,13 +18,16 @@ function setUpIndex() {
   const input = document.querySelector(".search input");
   const empty = document.querySelector(".empty");
   const sortButtons = [...document.querySelectorAll(".sort button")];
+  const chips = [...document.querySelectorAll(".tagbar .chip")];
   const alphabetical = cards.slice();
+  let tag = new URLSearchParams(location.search).get("tag")?.trim().toLowerCase() || "";
 
   function filter() {
     const words = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     let shown = 0;
     for (const card of cards) {
-      const hit = words.every((w) => card.dataset.text.includes(w));
+      const hit = words.every((w) => card.dataset.text.includes(w))
+        && (!tag || card.dataset.tags.split(" ").includes(tag));
       card.hidden = !hit;
       if (hit) shown++;
     }
@@ -48,6 +51,20 @@ function setUpIndex() {
     }
   });
   for (const b of sortButtons) b.addEventListener("click", () => sort(b.dataset.sort));
+
+  // Tags: one at a time. Tapping the current tag again shows everything.
+  for (const chip of chips) {
+    chip.addEventListener("click", (e) => {
+      e.preventDefault();
+      tag = chip.dataset.tag === tag ? "" : chip.dataset.tag;
+      for (const c of chips) {
+        if (c.dataset.tag === tag) c.setAttribute("aria-current", "true");
+        else c.removeAttribute("aria-current");
+      }
+      history.replaceState(null, "", tag ? "/?tag=" + encodeURIComponent(tag) : "/");
+      filter();
+    });
+  }
 
   sort(store.get("sort", "az"));
   filter(); // the browser may restore typed text on back

@@ -7,6 +7,8 @@
 #   recipe edit <name>      open a recipe in your editor
 #   recipe search <word>    find recipes that mention a word (e.g. an ingredient)
 #   recipe list             list every recipe
+#   recipe list --tag <tag> list recipes with a tag (e.g. vegan)
+#   recipe tags             list every tag and how many recipes use it
 #   recipe serve            show the recipes as a website (for your phone)
 #   recipe photos [name]    make photos for recipes that have none (OpenAI)
 
@@ -22,6 +24,24 @@ slug() {
 
 all_recipes() {
   find "$DIR" -maxdepth 1 -name '*.md' ! -name 'README.md' ! -name 'AGENTS.md' ! -name 'CLAUDE.md' -exec basename {} .md \; | sort
+}
+
+# The tags of one recipe, one per line, from its "Tags: a, b, c" line.
+tags_of() {
+  grep -i -m1 '^tags:' "$DIR/$1.md" | sed -E 's/^[Tt][Aa][Gg][Ss]:[[:space:]]*//' \
+    | tr ',' '\n' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | tr '[:upper:]' '[:lower:]' | grep . || true
+}
+
+with_tag() {
+  local want name
+  want="$(echo "$*" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  all_recipes | while read -r name; do
+    if tags_of "$name" | grep -qxF -- "$want"; then echo "$name"; fi
+  done
+}
+
+all_tags() {
+  all_recipes | while read -r name; do tags_of "$name"; done | sort | uniq -c | sort -k1,1nr -k2
 }
 
 # Match glow's theme to macOS light/dark mode, which the terminal follows.
@@ -86,10 +106,11 @@ new_recipe() {
     cat > "$file" <<EOF
 # $name
 
+Tags:
+
 Serves:
 Time:
 Source:
-Tags:
 
 ## Ingredients
 
@@ -115,7 +136,25 @@ case "${1:-}" in
     fi
     ;;
   list|ls)
-    all_recipes
+    shift
+    case "${1:-}" in
+      "") all_recipes ;;
+      -t|--tag)
+        shift
+        [[ $# -eq 0 ]] && { echo "Usage: recipe list --tag <tag>" >&2; exit 1; }
+        matches="$(with_tag "$@")"
+        if [[ -n "$matches" ]]; then
+          echo "$matches"
+        else
+          echo "No recipe has the tag \"$*\". Run 'recipe tags' to see them all." >&2
+          exit 1
+        fi
+        ;;
+      *) echo "Usage: recipe list [--tag <tag>]" >&2; exit 1 ;;
+    esac
+    ;;
+  tags)
+    all_tags
     ;;
   serve|web)
     shift; exec python3 "$DIR/site/serve.py" "$@"
@@ -135,7 +174,7 @@ case "${1:-}" in
     grep -ril --include='*.md' --exclude='README.md' --exclude='AGENTS.md' --exclude='CLAUDE.md' -- "$*" "$DIR" | xargs -n1 basename 2>/dev/null | sed 's/\.md$//' | sort
     ;;
   -h|--help|help)
-    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
     ;;
   *)
     name="$(find_recipe "$@")" && show "$name"

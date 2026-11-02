@@ -1,5 +1,7 @@
 # Vinegar Napa Cabbage (醋溜白菜)
 
+Tags: chinese, side, vegan, quick
+
 Sauce: vinegar, sugar, light & dark soy sauce, minced garlic.
 
 1. Mince scallion, ginger, and garlic (葱姜蒜).

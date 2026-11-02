@@ -1,5 +1,7 @@
 # Clear Broth Beef Brisket (清汤牛腩)
 
+Tags: chinese, soup, main, meat, one-pot
+
 Aromatics: ginger slices (姜片), scallion whites (葱白), star anise (八角).
 
 1. Blanch the beef (焯水) with ginger slices and cooking wine (料酒).

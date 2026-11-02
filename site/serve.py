@@ -17,7 +17,7 @@ import subprocess
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 SITE = Path(__file__).resolve().parent
 ROOT = SITE.parent
@@ -37,6 +37,8 @@ class Recipe:
             (l[2:].strip() for l in self.text.splitlines() if l.startswith("# ")),
             self.slug.replace("-", " ").title(),
         )
+        tags = TAGS_LINE.search(self.text)
+        self.tags = [t.strip().lower() for t in tags.group(1).split(",") if t.strip()] if tags else []
         self.added = added
         self.revised = revised
         self.number = 0
@@ -52,8 +54,16 @@ class Recipe:
 
     @property
     def body(self):
-        """The Markdown without its title line, which the page shows on its own."""
-        return re.sub(r"\A\s*# .*\n?", "", self.text, count=1)
+        """The Markdown without its title and tags lines, which the page shows on their own."""
+        text = re.sub(r"\A\s*# .*\n?", "", self.text, count=1)
+        return TAGS_LINE.sub("", text, count=1)
+
+
+TAGS_LINE = re.compile(r"^tags:[ \t]*(.*)\n?", re.M | re.I)  # "Tags: indian, main, vegan"
+
+
+def tag_url(tag):
+    return f"/?tag={quote(tag)}"
 
 
 def git_dates():
@@ -219,17 +229,33 @@ def thumb(recipe, cls):
     return f'<div class="{cls} {cls}--blank" aria-hidden="true"><span>{esc(recipe.title[:1])}</span></div>'
 
 
-def index_page(all_recipes):
+def index_page(all_recipes, tag=""):
     cards = []
     for r in all_recipes:
         search = esc(f"{r.title} {r.text}".lower())
-        cards.append(f"""<li class="card" data-text="{search}" data-number="{r.number}">
+        hidden = " hidden" if tag and tag not in r.tags else ""
+        cards.append(f"""<li class="card" data-text="{search}" data-tags="{esc(' '.join(r.tags))}" data-number="{r.number}"{hidden}>
   <a href="{r.url}">
     {thumb(r, "card__img")}
     <span class="card__no">No. {r.number:02d}</span>
     <span class="card__title">{esc(r.title)}</span>
   </a>
 </li>""")
+
+    # Tag links, most used first. They work without JavaScript; app.js filters in place.
+    counts = {}
+    for r in all_recipes:
+        for t in r.tags:
+            counts[t] = counts.get(t, 0) + 1
+    def chip(href, label, t):
+        current = ' aria-current="true"' if t == tag else ""
+        return f'<a class="chip" href="{esc(href)}" data-tag="{esc(t)}"{current}>{esc(label)}</a>'
+
+    chips = [chip("/", "All", "")]
+    chips += [chip(tag_url(t), t, t) for t in sorted(counts, key=lambda t: (-counts[t], t))]
+    tag_bar = f'<nav class="tagbar" aria-label="Tags">{"".join(chips)}</nav>' if counts else ""
+    shown = sum(1 for r in all_recipes if not tag or tag in r.tags)
+    empty_hidden = "" if tag and not shown else " hidden"
 
     since = min((r.added for r in all_recipes), default=date.today())
     count = len(all_recipes)
@@ -251,11 +277,12 @@ def index_page(all_recipes):
     <button type="button" data-sort="new" aria-pressed="false">Newest</button>
   </div>
 </div>
+{tag_bar}
 
 <ul class="grid">
 {''.join(cards)}
 </ul>
-<p class="empty" hidden>Nothing in the archive matches that.</p>
+<p class="empty"{empty_hidden}>Nothing in the archive matches that.</p>
 
 <footer class="colophon">Kept in plain text. Served from the kitchen.</footer>
 </div>"""
@@ -271,6 +298,8 @@ def recipe_page(recipe, all_recipes):
     if recipe.revised != recipe.added:
         dates += f" · Revised {day(recipe.revised)}"
     steps = f" · {recipe.steps} steps" if recipe.steps else ""
+    tags = "".join(f'<a class="chip" href="{esc(tag_url(t))}">{esc(t)}</a>' for t in recipe.tags)
+    tags = f'<p class="recipe-head__tags">{tags}</p>' if tags else ""
 
     hero = (
         f'<figure class="hero"><img src="{esc(recipe.image)}" alt="{esc(recipe.title)}" '
@@ -299,6 +328,7 @@ def recipe_page(recipe, all_recipes):
   <p class="eyebrow">No. {recipe.number:02d}</p>
   <h1 class="recipe-head__title">{esc(recipe.title)}</h1>
   <p class="recipe-head__meta">{dates}{steps}</p>
+  {tags}
 </header>
 
 <article class="recipe" data-key="{esc(recipe.slug)}">
@@ -331,10 +361,12 @@ def not_found_page():
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        url = unquote(urlparse(self.path).path)
+        parsed = urlparse(self.path)
+        url = unquote(parsed.path)
 
         if url == "/":
-            return self.send_html(200, index_page(load_recipes()))
+            tag = parse_qs(parsed.query).get("tag", [""])[0].strip().lower()
+            return self.send_html(200, index_page(load_recipes(), tag))
 
         if url.startswith("/r/"):
             all_recipes = load_recipes()

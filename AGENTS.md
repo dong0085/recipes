@@ -11,7 +11,7 @@ The owner types `recipes` (plural), which is a shell function in `~/.zshrc`. On 
 
 ```
 *.md                   one file per recipe; README.md, AGENTS.md, CLAUDE.md are docs
-recipe                 terminal tool: show, search, list, new, edit, serve, photos
+recipe                 terminal tool: show, search, list, tags, new, edit, serve, photos
 images/<slug>.jpg      one photo per recipe, 1200×800 JPEG
 site/serve.py          web server and page templates (Python standard library)
 site/thumbnails.py     makes recipe photos with the OpenAI image API
@@ -24,6 +24,11 @@ The slug is the file name without `.md`. It links a recipe to its photo and its 
 ## Recipes
 
 - The first line is the title: `# Avocado Hummus`.
+- Below the title, after a blank line, comes a tags line: `Tags: middle-eastern, dip, vegan, quick, no-cook`. The site shows tags under the title and filters by them on the home page; `./recipe list --tag` and `./recipe tags` read them in the terminal. Tags are lowercase English, separated by commas, with hyphens inside a tag. Take them from these groups, in this order, and ask the owner before adding a new tag:
+  - Cuisine: `chinese`, `indian`, `japanese`, `korean`, `italian`, `american`, `middle-eastern` (leave out when none fits)
+  - Type: `main`, `side`, `soup`, `dip`, `baking`
+  - Diet: `vegan`, `vegetarian`, `meat`
+  - Practical: `quick` (30 min or less), `one-pot`, `make-ahead`, `no-cook`, `cold`
 - The body uses a small set of Markdown: `##` section headings, paragraphs, numbered steps, `-` lists, and lists nested under a step with three spaces of indent. `site/serve.py` has its own small Markdown converter for exactly this set, so keep recipes within it or extend the converter.
 - Write amounts in the recipe, with metric and US units where useful (for example, "1 can chickpeas, 400 g / 15 oz").
 - File names are lowercase words joined by hyphens, such as `lentil-soup.md`.
@@ -41,7 +46,8 @@ Start it with `./recipe serve` (port 8000). It prints a LAN address for the phon
 - Recipe numbers ("No. 07") and "Added" dates come from git history: the first commit that added the file. Uncommitted recipes use the file's modified date.
 - The code uses only the Python standard library and plain CSS and JavaScript, and runs straight from the source files. Keep it that way so it runs anywhere with `python3`.
 - The list of doc files (`DOCS` in `serve.py` and `thumbnails.py`, and the `find`/`grep` lines in `recipe`) keeps them out of the recipe list. Add any new top-level doc file to all three.
-- `app.js` adds search, sorting, crossing off items (saved in `localStorage` per recipe), the text-size button, and a screen wake lock. Every page still reads well with JavaScript turned off.
+- Tag filtering works without JavaScript: `/?tag=vegan` is filtered on the server. `app.js` then filters in place when a tag is tapped.
+- `app.js` adds search, sorting, tag filtering, crossing off items (saved in `localStorage` per recipe), the text-size button, and a screen wake lock. Every page still reads well with JavaScript turned off.
 
 ### Design system
 

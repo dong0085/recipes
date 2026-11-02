@@ -1,5 +1,7 @@
 # Japanese Curry
 
+Tags: japanese, main, vegan, one-pot, make-ahead
+
 - 2 potatoes
 - Carrots
 - 1 onion

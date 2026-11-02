@@ -47,7 +47,11 @@ recipes new Chicken Curry  # start a new recipe from a template
 recipes edit curry         # open a recipe in your editor
 recipes search garlic      # list recipes that mention a word
 recipes list               # list all recipes
+recipes list --tag vegan   # list recipes with a tag
+recipes tags               # list every tag and how many recipes use it
 ```
+
+Each recipe has a tags line under its title, such as `Tags: indian, main, vegan, one-pot`. Tags cover cuisine, type of dish (main, side, soup), diet (vegan, vegetarian, meat), and practical notes (quick, one-pot, make-ahead).
 
 Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-list menu with a preview.
 
@@ -58,6 +62,7 @@ Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-
 On the site you can:
 
 - search by dish or ingredient, and sort A–Z or newest first
+- tap a tag, such as vegan or quick, to show only those recipes (tags also appear under each recipe's title)
 - tap an ingredient or step to cross it off (each recipe remembers this until you tap Clear)
 - tap the **A A** button to make the text bigger
 

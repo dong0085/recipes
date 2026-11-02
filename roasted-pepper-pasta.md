@@ -1,5 +1,7 @@
 # Roasted Pepper Pasta
 
+Tags: italian, main, vegetarian, quick
+
 1. Fry garlic in extra virgin olive oil.
 2. Combine with:
    - Roasted pepper

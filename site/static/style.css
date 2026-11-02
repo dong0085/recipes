@@ -451,6 +451,15 @@ button { font: inherit; color: inherit; }
   color: var(--accent);
 }
 
+/* A named dish inside a section, such as one dressing on the salads page. */
+.recipe h4 {
+  margin: var(--s6) 0 0;
+  font-size: 1.15em;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
 .recipe ol, .recipe ul {
   list-style: none;
   margin: var(--s2) 0;

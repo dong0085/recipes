@@ -1,6 +1,8 @@
 # Chana Masala
 
 Tags: indian, main, vegetarian, one-pot
+Serves: 4
+Time: 55 min
 
 ## Ingredients
 

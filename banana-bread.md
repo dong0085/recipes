@@ -1,6 +1,7 @@
 # Banana Bread
 
 Tags: american, baking, vegetarian, make-ahead
+Time: 1 hr 10 min
 
 1. Preheat the oven to 350 °F. Grease a loaf pan.
 2. Mash 2 bananas in a bowl. Stir in 1/3 cup melted butter.

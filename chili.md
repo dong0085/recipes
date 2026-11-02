@@ -1,6 +1,7 @@
 # Chili
 
 Tags: american, main, vegetarian, one-pot, make-ahead
+Time: 50 min
 
 1. Cook onion, carrot, bell pepper, celery, and salt for 7 min.
 2. Add the spices:

@@ -1,6 +1,8 @@
 # Avocado Hummus
 
 Tags: middle-eastern, dip, vegetarian, quick, no-cook
+Serves: 4
+Time: 10 min
 
 ## Ingredients
 

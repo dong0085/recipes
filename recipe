@@ -7,7 +7,7 @@
 #   recipe edit <name>      open a recipe in your editor
 #   recipe search <word>    find recipes that mention a word (e.g. an ingredient)
 #   recipe list             list every recipe
-#   recipe list --tag <tag> list recipes with a tag (e.g. vegan)
+#   recipe list --tag <tag> list recipes with a tag (e.g. vegetarian)
 #   recipe tags             list every tag and how many recipes use it
 #   recipe serve            show the recipes as a website (for your phone)
 #   recipe photos [name]    make photos for recipes that have none (OpenAI)

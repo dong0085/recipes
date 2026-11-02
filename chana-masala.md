@@ -1,6 +1,6 @@
 # Chana Masala
 
-Tags: indian, main, vegan, one-pot
+Tags: indian, main, vegetarian, one-pot
 
 1. Brown the onions.
 2. Add garlic and ginger.

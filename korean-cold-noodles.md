@@ -1,6 +1,6 @@
 # Korean Cold Noodles
 
-Tags: korean, main, vegan, quick, cold
+Tags: korean, main, vegetarian, quick, cold
 
 Prep:
 - Noodles, cooked and cooled

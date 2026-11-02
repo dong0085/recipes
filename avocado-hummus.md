@@ -1,6 +1,6 @@
 # Avocado Hummus
 
-Tags: middle-eastern, dip, vegan, quick, no-cook
+Tags: middle-eastern, dip, vegetarian, quick, no-cook
 
 ## Ingredients
 

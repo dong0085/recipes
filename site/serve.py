@@ -59,7 +59,7 @@ class Recipe:
         return TAGS_LINE.sub("", text, count=1)
 
 
-TAGS_LINE = re.compile(r"^tags:[ \t]*(.*)\n?", re.M | re.I)  # "Tags: indian, main, vegan"
+TAGS_LINE = re.compile(r"^tags:[ \t]*(.*)\n?", re.M | re.I)  # "Tags: indian, main, vegetarian"
 
 
 def tag_url(tag):

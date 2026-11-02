@@ -1,0 +1,69 @@
+# Recipe archive
+
+A personal recipe archive. Each recipe is one Markdown file in this folder. Two tools read them:
+
+- `recipe`, a Bash script for the terminal
+- `site/`, a small website for reading recipes on a phone in the kitchen
+
+The owner types `recipes` (plural), which is a shell function in `~/.zshrc`. On its own, `recipes` moves into this folder. With arguments, it runs `./recipe` with those arguments. The README shows the function.
+
+## Layout
+
+```
+*.md                   one file per recipe; README.md, AGENTS.md, CLAUDE.md are docs
+recipe                 terminal tool: show, search, list, new, edit, serve, photos
+images/<slug>.jpg      one photo per recipe, 1200×800 JPEG
+site/serve.py          web server and page templates (Python standard library)
+site/thumbnails.py     makes recipe photos with the OpenAI image API
+site/static/           style.css, app.js, icons, manifest
+docs/screenshots/      phone screenshots shown in the README
+```
+
+The slug is the file name without `.md`. It links a recipe to its photo and its page URL (`/r/<slug>`).
+
+## Recipes
+
+- The first line is the title: `# Avocado Hummus`.
+- The body uses a small set of Markdown: `##` section headings, paragraphs, numbered steps, `-` lists, and lists nested under a step with three spaces of indent. `site/serve.py` has its own small Markdown converter for exactly this set, so keep recipes within it or extend the converter.
+- Write amounts in the recipe, with metric and US units where useful (for example, "1 can chickpeas, 400 g / 15 oz").
+- File names are lowercase words joined by hyphens, such as `lentil-soup.md`.
+- Some older recipes include Chinese dish names in parentheses. The avocado hummus recipe is English only, at the owner's request. Ask before changing the other recipes.
+
+After adding a recipe, run `./recipe photos` to make its photo.
+
+## Website
+
+Start it with `./recipe serve` (port 8000). It prints a LAN address for the phone.
+
+- Pages are built from the Markdown on every request, so recipe edits show up on refresh. Edits to `serve.py` need a server restart.
+- Static files load with a `?v=<mtime>` version and long caching, so CSS and JS changes show up on refresh too.
+- The server only serves files directly inside `images/` and `site/static/`.
+- Recipe numbers ("No. 07") and "Added" dates come from git history: the first commit that added the file. Uncommitted recipes use the file's modified date.
+- The code uses only the Python standard library and plain CSS and JavaScript, and runs straight from the source files. Keep it that way so it runs anywhere with `python3`.
+- The list of doc files (`DOCS` in `serve.py` and `thumbnails.py`, and the `find`/`grep` lines in `recipe`) keeps them out of the recipe list. Add any new top-level doc file to all three.
+- `app.js` adds search, sorting, crossing off items (saved in `localStorage` per recipe), the text-size button, and a screen wake lock. Every page still reads well with JavaScript turned off.
+
+### Design system
+
+All styling lives in `site/static/style.css`, with tokens at the top. Build new things from those tokens.
+
+- Colors: warm paper background (`--paper`), ink text, one terracotta accent (`--accent`). Dark mode redefines the same tokens under `prefers-color-scheme: dark` and dims photos slightly.
+- Type: `--serif` (system serif, New York on Apple devices) for titles and recipe text; `--sans` for small uppercase labels and buttons. Both come with the device, so pages load with zero font downloads.
+- Space: a 4px grid (`--s1` to `--s8`). Hairline rules (`--rule`) separate items; a solid ink rule sits under each page header.
+- Tone: minimal and quiet, like a printed archive. Small corner radius, generous white space, italic serif for meta text.
+- Phone first: test at 390px wide. Body text is large for reading at a distance, and inputs use 16px text so iOS keeps the zoom level steady.
+
+## Photos
+
+`./recipe photos` makes photos for recipes that have none. `./recipe photos <name>` remakes one, and `--all` remakes every photo.
+
+- Model: `gpt-image-2`, 1536×1024, medium quality, about $0.05 per photo. The script shrinks each one to 1200px wide with `sips`.
+- Every photo uses the same art direction (the `STYLE` text in `thumbnails.py`): seen from directly above, one stoneware bowl or plate, pale linen, soft window light, muted colors. Keep this style so the archive looks like one set.
+- The API key comes from `OPENAI_API_KEY`, or from the macOS keychain entry `openai-api-key`.
+- Making photos sends the recipe text to OpenAI and costs money, so check with the owner before remaking many photos.
+
+## Checking changes
+
+- Quick check: start the server and `curl` the pages (`/`, `/r/<slug>`, a missing slug, a static file).
+- Visual check: look at the home page and a recipe page at 390×844 in light and dark mode. Ask the owner before opening a real browser.
+- Keep the README in step with any change to commands or features. Retake the screenshots in `docs/screenshots/` when the design changes.

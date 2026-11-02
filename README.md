@@ -1,16 +1,37 @@
 # Recipes
 
-My recipe archive. Each recipe is a Markdown file, and the `recipe` script finds and shows them in the terminal.
+My recipe archive. Each recipe is a Markdown file, and the `recipe` script finds and shows them in the terminal. `recipes serve` also shows them as a website for reading on a phone in the kitchen.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/home.jpeg" width="200" alt="Home page: a grid of recipe photos with search and sort"></td>
+    <td><img src="docs/screenshots/recipe.jpeg" width="200" alt="Lentil soup recipe with the first step and garlic crossed off"></td>
+    <td><img src="docs/screenshots/search-dark.jpeg" width="200" alt="Searching for chickpeas in dark mode shows three recipes"></td>
+    <td><img src="docs/screenshots/recipe-dark.jpeg" width="200" alt="Avocado hummus recipe in dark mode with an ingredient crossed off"></td>
+  </tr>
+  <tr>
+    <td align="center">Browse</td>
+    <td align="center">Cook and cross off</td>
+    <td align="center">Search by ingredient</td>
+    <td align="center">Dark mode</td>
+  </tr>
+</table>
 
 ## Setup
 
-Add an alias to `~/.zshrc` so `recipe` works from any folder:
+Add a `recipes` function to `~/.zshrc` so it works from any folder. On its own, `recipes` takes you to this folder. With anything after it, it runs the script:
 
 ```sh
-alias recipe=/path/to/recipes/recipe
+recipes() {
+  if [[ $# -eq 0 ]]; then
+    cd /path/to/recipes
+  else
+    /path/to/recipes/recipe "$@"
+  fi
+}
 ```
 
-For nicer formatting, install [glow](https://github.com/charmbracelet/glow). For a pick-from-a-list menu, install [fzf](https://github.com/junegunn/fzf). Both are optional:
+For nicer formatting, install [glow](https://github.com/charmbracelet/glow). When several recipes match a name, [fzf](https://github.com/junegunn/fzf) lets you pick one from a list. Both are optional:
 
 ```sh
 brew install glow fzf
@@ -19,13 +40,39 @@ brew install glow fzf
 ## Usage
 
 ```sh
-recipe bread              # show a recipe (part of the name is enough)
-recipe banana-bread.md    # file names work too
-recipe                    # pick from a list, with a preview
-recipe new Chicken Curry  # start a new recipe from a template
-recipe edit curry         # open a recipe in your editor
-recipe search garlic      # list recipes that mention a word
-recipe list               # list all recipes
+recipes                    # go to the recipes folder
+recipes bread              # show a recipe (part of the name is enough)
+recipes banana-bread.md    # file names work too
+recipes new Chicken Curry  # start a new recipe from a template
+recipes edit curry         # open a recipe in your editor
+recipes search garlic      # list recipes that mention a word
+recipes list               # list all recipes
 ```
+
+Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-list menu with a preview.
+
+## Website
+
+`recipes serve` shows the archive as a website, so you can read recipes on your phone in the kitchen. It prints an address like `http://10.0.0.160:8000`. Open it on a phone on the same Wi-Fi. In Safari, tap Share → Add to Home Screen to get an app icon.
+
+On the site you can:
+
+- search by dish or ingredient, and sort A–Z or newest first
+- tap an ingredient or step to cross it off (each recipe remembers this until you tap Clear)
+- tap the **A A** button to make the text bigger
+
+Pages are built from the Markdown files each time they load, so edits show up on refresh. The site uses only Python, with nothing to install. Its code is in `site/`.
+
+## Photos
+
+Each recipe has a photo in `images/<recipe>.jpg`, made with the OpenAI image API (`gpt-image-2`). Every photo uses the same art direction, so they look like a set.
+
+```sh
+recipes photos           # make photos for recipes that have none yet
+recipes photos chili     # remake one recipe's photo
+recipes photos --all     # remake every photo
+```
+
+The API key comes from `OPENAI_API_KEY`, or from the macOS keychain entry `openai-api-key`. You can also drop in your own photo as `images/<recipe>.jpg`.
 
 When the display uses glow, it switches between light and dark themes to match macOS.

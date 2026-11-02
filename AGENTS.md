@@ -26,9 +26,11 @@ The slug is the file name without `.md`. It links a recipe to its photo and its 
 - The first line is the title: `# Avocado Hummus`.
 - Below the title, after a blank line, comes a tags line: `Tags: middle-eastern, dip, vegetarian, quick, no-cook`. The site shows tags under the title and filters by them on the home page; `./recipe list --tag` and `./recipe tags` read them in the terminal. Tags are lowercase English, separated by commas, with hyphens inside a tag. Take them from these groups, in this order, and ask the owner before adding a new tag:
   - Cuisine: `chinese`, `indian`, `japanese`, `korean`, `italian`, `american`, `middle-eastern` (leave out when none fits)
-  - Type: `main`, `side`, `soup`, `dip`, `baking`
+  - Type: `main`, `side`, `soup`, `dip`, `baking`, `salad`, `dressing` (`salad` and `dressing` put a recipe on the Salads tab)
   - Diet: `vegetarian`, `meat`
   - Practical: `quick` (30 min or less), `one-pot`, `make-ahead`, `no-cook`, `cold`
+- Optional lines can follow the tags line: `Serves: 4`, `Time: 45 min`, and `Source: <url or name>`. The site shows them as facts at the top of the page and on the card. A `Serves` value that starts with a number turns on the serving scaler.
+- To point a salad at its dressing, link to it in the ingredient list: `- 1 batch [Apple Cider Vinaigrette](/r/apple-cider-vinaigrette)`. The dressing's page then lists the salad under "Used in".
 - The body uses a small set of Markdown: `##` section headings, paragraphs, numbered steps, `-` lists, and lists nested under a step with three spaces of indent. `site/serve.py` has its own small Markdown converter for exactly this set, so keep recipes within it or extend the converter.
 - Write amounts in the recipe, with metric and US units where useful (for example, "1 can chickpeas, 400 g / 15 oz").
 - File names are lowercase words joined by hyphens, such as `lentil-soup.md`.
@@ -46,8 +48,10 @@ Start it with `./recipe serve` (port 8000). It prints a LAN address for the phon
 - Recipe numbers ("No. 07") and "Added" dates come from git history: the first commit that added the file. Uncommitted recipes use the file's modified date.
 - The code uses only the Python standard library and plain CSS and JavaScript, and runs straight from the source files. Keep it that way so it runs anywhere with `python3`.
 - The list of doc files (`DOCS` in `serve.py` and `thumbnails.py`, and the `find`/`grep` lines in `recipe`) keeps them out of the recipe list. Add any new top-level doc file to all three.
-- Tag filtering works without JavaScript: `/?tag=vegetarian` is filtered on the server. `app.js` then filters in place when a tag is tapped.
-- `app.js` adds search, sorting, tag filtering, crossing off items (saved in `localStorage` per recipe), the text-size button, and a screen wake lock. Every page still reads well with JavaScript turned off.
+- The home page has tabs, set by `TABS` in `serve.py`: Recipes at `/`, and Salads at `/salads` with a Salads section (tag `salad`) and a Dressings section (tag `dressing`). Each recipe belongs to one tab. Recipe pages link back to their tab, and Previous/Next stay within it.
+- Tag filtering works without JavaScript: `/?tag=vegetarian` and `/salads?tag=quick` are filtered on the server. `app.js` then filters in place when a tag is tapped.
+- The Markdown converter marks bullet lists as `class="ingredients"`; lists under headings such as Notes or Tips stay plain. The serving scaler and the shopping list read the ingredient lists.
+- `app.js` adds search, sorting, tag filtering, saved recipes, the serving scaler, step timers, the shopping list at `/list`, printing, crossing off items, the text-size button, and a screen wake lock. It keeps its data in `localStorage` under `saved`, `list`, `timers`, `sort`, `text-size`, and `done:<slug>`. Every page still reads well with JavaScript turned off.
 
 ### Design system
 
@@ -70,6 +74,6 @@ All styling lives in `site/static/style.css`, with tokens at the top. Build new 
 
 ## Checking changes
 
-- Quick check: start the server and `curl` the pages (`/`, `/r/<slug>`, a missing slug, a static file).
+- Quick check: start the server and `curl` the pages (`/`, `/salads`, `/list`, `/r/<slug>`, a missing slug, a static file).
 - Visual check: look at the home page and a recipe page at 390×844 in light and dark mode. Ask the owner before opening a real browser.
 - Keep the README in step with any change to commands or features. Retake the screenshots in `docs/screenshots/` when the design changes.

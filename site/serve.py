@@ -25,8 +25,23 @@ IMAGES = ROOT / "images"
 STATIC = SITE / "static"
 DOCS = {"README.md", "AGENTS.md", "CLAUDE.md"}  # Markdown files that are docs, not recipes
 
+# The tabs on the home page: slug -> (URL, title, sections). Each section is
+# (tag, heading, blurb). A recipe belongs to the first tab with a section matching
+# one of its tags; the Recipes tab holds everything else as one grid.
+TABS = {
+    "recipes": ("/", "Recipes", ()),
+    "salads": ("/salads", "Salads", (
+        ("salad", "Salads", "Bowls to build a meal around."),
+        ("dressing", "Dressings", "Shake in a jar. Each one dresses a salad for four."),
+    )),
+}
+
 
 # ------------------------------------------------------------------ recipes
+
+# Lines under the title such as "Tags: indian, main", "Serves: 4", "Time: 45 min".
+META_LINE = re.compile(r"^(tags|serves|time|source):[ \t]*(.*)\n?", re.M | re.I)
+
 
 class Recipe:
     def __init__(self, path, added, revised):
@@ -37,11 +52,19 @@ class Recipe:
             (l[2:].strip() for l in self.text.splitlines() if l.startswith("# ")),
             self.slug.replace("-", " ").title(),
         )
-        tags = TAGS_LINE.search(self.text)
-        self.tags = [t.strip().lower() for t in tags.group(1).split(",") if t.strip()] if tags else []
+        meta = {}
+        for key, value in META_LINE.findall(self.text):
+            meta.setdefault(key.lower(), value.strip())
+        self.tags = [t.strip().lower() for t in meta.get("tags", "").split(",") if t.strip()]
+        self.serves = meta.get("serves", "")
+        number = re.match(r"\d+", self.serves)
+        self.serves_n = int(number.group()) if number else 0
+        self.time = meta.get("time", "")
+        self.source = meta.get("source", "")
         self.added = added
         self.revised = revised
         self.number = 0
+        self.tab = "recipes"
         self.steps = len(re.findall(r"^\d+[.)]\s", self.text, re.M))
         image = IMAGES / f"{self.slug}.jpg"
         self.image = (
@@ -54,16 +77,28 @@ class Recipe:
 
     @property
     def body(self):
-        """The Markdown without its title and tags lines, which the page shows on their own."""
+        """The Markdown without its title and meta lines, which the page shows on their own."""
         text = re.sub(r"\A\s*# .*\n?", "", self.text, count=1)
-        return TAGS_LINE.sub("", text, count=1)
+        return META_LINE.sub("", text)
+
+    @property
+    def facts(self):
+        """Short facts for a card: "45 min · Serves 4"."""
+        parts = [self.time] if self.time else []
+        if self.serves:
+            parts.append(f"Serves {self.serves}")
+        return " · ".join(parts)
 
 
-TAGS_LINE = re.compile(r"^tags:[ \t]*(.*)\n?", re.M | re.I)  # "Tags: indian, main, vegetarian"
+def tab_of(recipe):
+    for slug, (_, _, sections) in TABS.items():
+        if any(tag in recipe.tags for tag, _, _ in sections):
+            return slug
+    return "recipes"
 
 
-def tag_url(tag):
-    return f"/?tag={quote(tag)}"
+def tag_url(tag, tab="recipes"):
+    return f"{TABS[tab][0]}?tag={quote(tag)}"
 
 
 def git_dates():
@@ -97,6 +132,7 @@ def load_recipes():
         found.append(Recipe(path, first, last))
     for number, recipe in enumerate(sorted(found, key=lambda r: (r.added, r.slug)), start=1):
         recipe.number = number
+        recipe.tab = tab_of(recipe)
     return sorted(found, key=lambda r: r.title.lower())
 
 
@@ -123,11 +159,18 @@ def inline(text):
 
 LIST_ITEM = re.compile(r"^(\s*)(\d+)[.)]\s+(.*)$|^(\s*)[-*+]\s+(.*)$")
 HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+# Bullet lists are ingredients, except under headings like these.
+NOT_INGREDIENTS = re.compile(r"note|tip|serv|storage|variation", re.I)
 
 
 def markdown(text):
-    """Enough Markdown for recipes: headings, paragraphs, and nested lists."""
+    """Enough Markdown for recipes: headings, paragraphs, and nested lists.
+
+    Bullet lists get class="ingredients" (for the scaler and the shopping list)
+    unless they sit under a heading such as "Notes".
+    """
     out, para, stack = [], [], []  # stack holds (tag, indent) for each open list
+    heading = ""
 
     def flush_para():
         if para:
@@ -152,7 +195,8 @@ def markdown(text):
             if stack and stack[-1][1] == indent:
                 out.append("</li>")
             else:
-                out.append(f"<{tag}>")
+                cls = ' class="ingredients"' if tag == "ul" and not NOT_INGREDIENTS.search(heading) else ""
+                out.append(f"<{tag}{cls}>")
                 stack.append((tag, indent))
             data = f' data-n="{number}"' if number else ""
             out.append(f"<li{data}>{inline(body)}")
@@ -171,6 +215,7 @@ def markdown(text):
         h = HEADING.match(line)
         if h:
             flush_para()
+            heading = h.group(2)
             level = min(len(h.group(1)) + 1, 6)  # the page title is the only <h1>
             out.append(f"<h{level}>{inline(h.group(2))}</h{level}>")
         else:
@@ -196,6 +241,25 @@ def asset(name):
     return f"/static/{name}?v={int(path.stat().st_mtime)}"
 
 
+# Small line icons, drawn on a 20×20 grid with the current text colour.
+ICONS = {
+    "back": '<path d="M12.5 4.5L7 10l5.5 5.5"/>',
+    "search": '<circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/>',
+    "list": '<path d="M7 5.5h10M7 10h10M7 14.5h10"/><circle cx="3.5" cy="5.5" r=".6"/>'
+            '<circle cx="3.5" cy="10" r=".6"/><circle cx="3.5" cy="14.5" r=".6"/>',
+    "heart": '<path d="M10 16.5s-6.5-3.9-6.5-8.4A3.6 3.6 0 0 1 10 6a3.6 3.6 0 0 1 6.5 2.1c0 4.5-6.5 8.4-6.5 8.4z"/>',
+    "print": '<path d="M5.5 8V3.5h9V8M5.5 14h-2V8.5h13V14h-2"/><path d="M5.5 11.5h9v5h-9z"/>',
+    "clock": '<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>',
+    "plus": '<path d="M10 4.5v11M4.5 10h11"/>',
+    "minus": '<path d="M4.5 10h11"/>',
+    "close": '<path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/>',
+}
+
+
+def icon(name):
+    return f'<svg class="icon" viewBox="0 0 20 20" aria-hidden="true">{ICONS[name]}</svg>'
+
+
 def page(title, body, kind):
     return f"""<!doctype html>
 <html lang="en" data-page="{kind}">
@@ -218,6 +282,7 @@ def page(title, body, kind):
 </head>
 <body>
 {body}
+<aside class="dock" aria-label="Timers" aria-live="polite" hidden></aside>
 <script src="{asset('app.js')}" defer></script>
 </body>
 </html>"""
@@ -229,48 +294,97 @@ def thumb(recipe, cls):
     return f'<div class="{cls} {cls}--blank" aria-hidden="true"><span>{esc(recipe.title[:1])}</span></div>'
 
 
-def index_page(all_recipes, tag=""):
-    cards = []
-    for r in all_recipes:
-        search = esc(f"{r.title} {r.text}".lower())
-        hidden = " hidden" if tag and tag not in r.tags else ""
-        cards.append(f"""<li class="card" data-text="{search}" data-tags="{esc(' '.join(r.tags))}" data-number="{r.number}"{hidden}>
+def list_link(cls):
+    """The shopping list link; app.js fills in the count."""
+    return (f'<a class="{cls}" href="/list">{icon("list")}<span>Shopping list</span>'
+            f'<span class="count" data-list-count hidden></span></a>')
+
+
+def card(r, tag):
+    search = esc(f"{r.title} {r.text}".lower())
+    hidden = " hidden" if tag and tag not in r.tags else ""
+    facts = f'<span class="card__facts">{icon("clock")}{esc(r.facts)}</span>' if r.facts else ""
+    return f"""<li class="card" data-slug="{esc(r.slug)}" data-text="{search}" data-tags="{esc(' '.join(r.tags))}" data-number="{r.number}"{hidden}>
   <a href="{r.url}">
-    {thumb(r, "card__img")}
+    <span class="card__frame">{thumb(r, "card__img")}<span class="card__saved" aria-label="Saved" hidden>{icon("heart")}</span></span>
     <span class="card__no">No. {r.number:02d}</span>
     <span class="card__title">{esc(r.title)}</span>
+    {facts}
   </a>
-</li>""")
+</li>"""
+
+
+def index_page(all_recipes, tab="recipes", tag=""):
+    url, tab_title, sections = TABS[tab]
+    members = [r for r in all_recipes if r.tab == tab]
+    section_tags = {t for t, _, _ in sections}
+
+    # One shelf per section; the Recipes tab is a single shelf with no heading.
+    shelves = []
+    for sec_tag, heading, blurb in sections or ((None, "", ""),):
+        items = [r for r in members if sec_tag is None or sec_tag in r.tags]
+        if not items:
+            continue
+        shown = sum(1 for r in items if not tag or tag in r.tags)
+        head = ""
+        if heading:
+            head = f"""<header class="shelf__head">
+    <h2 class="shelf__title">{esc(heading)}</h2>
+    <span class="shelf__count">{len(items)}</span>
+    <p class="shelf__blurb">{esc(blurb)}</p>
+  </header>"""
+        shelves.append(f"""<section class="shelf"{"" if shown else " hidden"}>
+  {head}
+  <ul class="grid">
+{''.join(card(r, tag) for r in items)}
+  </ul>
+</section>""")
 
     # Tag links, most used first. They work without JavaScript; app.js filters in place.
     counts = {}
-    for r in all_recipes:
+    for r in members:
         for t in r.tags:
-            counts[t] = counts.get(t, 0) + 1
+            if t not in section_tags:
+                counts[t] = counts.get(t, 0) + 1
+
     def chip(href, label, t):
         current = ' aria-current="true"' if t == tag else ""
         return f'<a class="chip" href="{esc(href)}" data-tag="{esc(t)}"{current}>{esc(label)}</a>'
 
-    chips = [chip("/", "All", "")]
-    chips += [chip(tag_url(t), t, t) for t in sorted(counts, key=lambda t: (-counts[t], t))]
-    tag_bar = f'<nav class="tagbar" aria-label="Tags">{"".join(chips)}</nav>' if counts else ""
-    shown = sum(1 for r in all_recipes if not tag or tag in r.tags)
-    empty_hidden = "" if tag and not shown else " hidden"
+    chips = [chip(url, "All", "")]
+    chips.append(f'<button class="chip chip--saved" type="button" data-tag="saved" hidden>'
+                 f'{icon("heart")}Saved</button>')
+    chips += [chip(tag_url(t, tab), t, t) for t in sorted(counts, key=lambda t: (-counts[t], t))]
+    tag_bar = f'<nav class="tagbar" aria-label="Tags" data-base="{esc(url)}">{"".join(chips)}</nav>'
+
+    shown = sum(1 for r in members if not tag or tag in r.tags)
+    empty_hidden = "" if not shown else " hidden"
+
+    tabs = []
+    for slug, (t_url, t_title, _) in TABS.items():
+        n = sum(1 for r in all_recipes if r.tab == slug)
+        current = ' aria-current="page"' if slug == tab else ""
+        tabs.append(f'<a href="{t_url}"{current}>{esc(t_title)}<span class="tabs__count">{n}</span></a>')
 
     since = min((r.added for r in all_recipes), default=date.today())
     count = len(all_recipes)
     body = f"""<div class="wrap">
 <header class="masthead">
-  <p class="eyebrow">A personal archive</p>
+  <div class="masthead__top">
+    <p class="eyebrow">A personal archive</p>
+    {list_link("masthead__list")}
+  </div>
   <h1 class="masthead__title">Recipes</h1>
   <p class="masthead__meta">{count} recipe{'s' if count != 1 else ''} · kept since {since:%B %Y}</p>
 </header>
 
+<nav class="tabs" aria-label="Sections">{''.join(tabs)}</nav>
+
 <div class="toolbar">
   <label class="search">
-    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
-    <input type="search" name="q" placeholder="Search" autocomplete="off"
-           autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search recipes">
+    {icon("search")}
+    <input type="search" name="q" placeholder="Search {esc(tab_title.lower())}" autocomplete="off"
+           autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search {esc(tab_title.lower())}">
   </label>
   <div class="sort" role="group" aria-label="Sort">
     <button type="button" data-sort="az" aria-pressed="true">A–Z</button>
@@ -279,26 +393,38 @@ def index_page(all_recipes, tag=""):
 </div>
 {tag_bar}
 
-<ul class="grid">
-{''.join(cards)}
-</ul>
-<p class="empty"{empty_hidden}>Nothing in the archive matches that.</p>
+{''.join(shelves)}
+<p class="empty"{empty_hidden}>Nothing here matches that.</p>
 
 <footer class="colophon">Kept in plain text. Served from the kitchen.</footer>
 </div>"""
-    return page("Recipes", body, "index")
+    title = "Recipes" if tab == "recipes" else f"{tab_title} · Recipes"
+    return page(title, body, "index")
+
+
+def topbar(back_url, back_label):
+    return f"""<nav class="topbar">
+  <a class="topbar__back" href="{esc(back_url)}">{icon("back")}{esc(back_label)}</a>
+  <div class="topbar__tools">
+    {list_link("topbar__list")}
+    <button class="topbar__size" type="button" aria-label="Change text size" hidden>
+      <span class="a-small">A</span><span class="a-large">A</span>
+    </button>
+  </div>
+</nav>"""
 
 
 def recipe_page(recipe, all_recipes):
-    i = all_recipes.index(recipe)
-    prev_r = all_recipes[i - 1] if i > 0 else None
-    next_r = all_recipes[i + 1] if i + 1 < len(all_recipes) else None
+    siblings = [r for r in all_recipes if r.tab == recipe.tab]
+    i = siblings.index(recipe)
+    prev_r = siblings[i - 1] if i > 0 else None
+    next_r = siblings[i + 1] if i + 1 < len(siblings) else None
+    tab_url, tab_title, _ = TABS[recipe.tab]
 
     dates = f"Added {day(recipe.added)}"
     if recipe.revised != recipe.added:
         dates += f" · Revised {day(recipe.revised)}"
-    steps = f" · {recipe.steps} steps" if recipe.steps else ""
-    tags = "".join(f'<a class="chip" href="{esc(tag_url(t))}">{esc(t)}</a>' for t in recipe.tags)
+    tags = "".join(f'<a class="chip" href="{esc(tag_url(t, recipe.tab))}">{esc(t)}</a>' for t in recipe.tags)
     tags = f'<p class="recipe-head__tags">{tags}</p>' if tags else ""
 
     hero = (
@@ -307,38 +433,78 @@ def recipe_page(recipe, all_recipes):
         if recipe.image else ""
     )
 
+    # Facts: servings (with a scaler when it starts with a number), time, steps, source.
+    facts = []
+    if recipe.serves:
+        stepper = ""
+        if recipe.serves_n:
+            stepper = (f'<button class="stepper" type="button" data-step="-1" aria-label="Fewer servings" hidden>{icon("minus")}</button>'
+                       f'<output class="serves" data-base="{recipe.serves_n}">{esc(recipe.serves)}</output>'
+                       f'<button class="stepper" type="button" data-step="1" aria-label="More servings" hidden>{icon("plus")}</button>')
+        else:
+            stepper = f"<span>{esc(recipe.serves)}</span>"
+        facts.append(f'<div class="fact"><span class="fact__label">Serves</span><span class="fact__value">{stepper}</span></div>')
+    if recipe.time:
+        facts.append(f'<div class="fact"><span class="fact__label">Time</span><span class="fact__value">{esc(recipe.time)}</span></div>')
+    if recipe.steps:
+        facts.append(f'<div class="fact"><span class="fact__label">Steps</span><span class="fact__value">{recipe.steps}</span></div>')
+    facts_html = f'<section class="facts" aria-label="At a glance">{"".join(facts)}</section>' if facts else ""
+    scaled_note = '<p class="facts__note" hidden>Amounts in the lists are scaled. Amounts written in the steps are for the original recipe.</p>'
+
+    source = ""
+    if recipe.source:
+        if re.match(r"https?://", recipe.source):
+            source = f'<p class="recipe-head__source">Source: <a href="{esc(recipe.source)}">{esc(urlparse(recipe.source).netloc)}</a></p>'
+        else:
+            source = f'<p class="recipe-head__source">Source: {esc(recipe.source)}</p>'
+
+    # "Used in": other recipes that link here, such as a salad that uses this dressing.
+    link = f"/r/{recipe.slug})"
+    used_in = [r for r in all_recipes if r is not recipe and link in r.text]
+    used_html = ""
+    if used_in:
+        links = "".join(f'<li><a href="{r.url}">{thumb(r, "mini__img")}<span>{esc(r.title)}</span></a></li>' for r in used_in)
+        used_html = f'<section class="related"><h2 class="eyebrow">Used in</h2><ul class="mini">{links}</ul></section>'
+
     def pager(r, label, cls):
         if not r:
             return '<span class="pager__spacer"></span>'
         return (f'<a class="pager__link {cls}" href="{r.url}"><span class="eyebrow">{label}</span>'
                 f'<span class="pager__title">{esc(r.title)}</span></a>')
 
-    body = f"""<nav class="topbar">
-  <a class="topbar__back" href="/">
-    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg>Archive
-  </a>
-  <button class="topbar__size" type="button" aria-label="Change text size">
-    <span class="a-small">A</span><span class="a-large">A</span>
-  </button>
-</nav>
+    back_label = "Archive" if recipe.tab == "recipes" else tab_title
+    section = "" if recipe.tab == "recipes" else f" · {esc(tab_title)}"
+    body = f"""{topbar(tab_url, back_label)}
 
 <main class="read">
 {hero}
 <header class="recipe-head">
-  <p class="eyebrow">No. {recipe.number:02d}</p>
+  <p class="eyebrow">No. {recipe.number:02d}{section}</p>
   <h1 class="recipe-head__title">{esc(recipe.title)}</h1>
-  <p class="recipe-head__meta">{dates}{steps}</p>
+  <p class="recipe-head__meta">{dates}</p>
+  {source}
   {tags}
 </header>
 
-<article class="recipe" data-key="{esc(recipe.slug)}">
+{facts_html}
+{scaled_note}
+
+<div class="actions" hidden>
+  <button class="action action--list" type="button">{icon("list")}<span>Add to shopping list</span></button>
+  <button class="action action--save" type="button" aria-pressed="false">{icon("heart")}<span>Save</span></button>
+  <button class="action action--print" type="button">{icon("print")}<span>Print</span></button>
+</div>
+
+<article class="recipe" data-key="{esc(recipe.slug)}" data-title="{esc(recipe.title)}">
 {markdown(recipe.body)}
 </article>
 
 <div class="progress">
-  <p>Tap an ingredient or step to cross it off.</p>
+  <p>Tap an ingredient or step to cross it off. Tap a time to start a timer.</p>
   <button class="progress__clear" type="button" hidden>Clear</button>
 </div>
+
+{used_html}
 
 <nav class="pager">
   {pager(prev_r, "Previous", "pager__link--prev")}
@@ -348,13 +514,36 @@ def recipe_page(recipe, all_recipes):
     return page(recipe.title, body, "recipe")
 
 
+def list_page():
+    body = f"""{topbar("/", "Archive")}
+
+<main class="read">
+<header class="recipe-head">
+  <p class="eyebrow">Shopping list</p>
+  <h1 class="recipe-head__title">To buy</h1>
+  <p class="recipe-head__meta" data-list-summary>Nothing on the list yet.</p>
+</header>
+
+<div class="actions" hidden>
+  <button class="action action--share" type="button">{icon("list")}<span>Copy list</span></button>
+  <button class="action action--clear-done" type="button">{icon("close")}<span>Remove crossed off</span></button>
+  <button class="action action--clear-all" type="button">{icon("close")}<span>Clear all</span></button>
+</div>
+
+<div class="shop"></div>
+<p class="empty shop__empty">Open a recipe and tap <strong>Add to shopping list</strong>. Its ingredients collect here, grouped by recipe.</p>
+<noscript><p class="empty">The shopping list lives on this device and needs JavaScript.</p></noscript>
+</main>"""
+    return page("Shopping list · Recipes", body, "list")
+
+
 def not_found_page():
     body = """<div class="wrap"><header class="masthead">
   <p class="eyebrow">Not in the archive</p>
   <h1 class="masthead__title">Recipe not found</h1>
   <p class="masthead__meta"><a href="/">Back to all recipes</a></p>
 </header></div>"""
-    return page("Not found", body, "index")
+    return page("Not found", body, "missing")
 
 
 # ------------------------------------------------------------------ server
@@ -363,10 +552,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         url = unquote(parsed.path)
+        if len(url) > 1:
+            url = url.rstrip("/")
 
-        if url == "/":
-            tag = parse_qs(parsed.query).get("tag", [""])[0].strip().lower()
-            return self.send_html(200, index_page(load_recipes(), tag))
+        for slug, (tab_url, _, _) in TABS.items():
+            if url == tab_url:
+                tag = parse_qs(parsed.query).get("tag", [""])[0].strip().lower()
+                return self.send_html(200, index_page(load_recipes(), slug, tag))
+
+        if url == "/list":
+            return self.send_html(200, list_page())
 
         if url.startswith("/r/"):
             all_recipes = load_recipes()

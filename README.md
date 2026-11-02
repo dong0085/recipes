@@ -51,7 +51,7 @@ recipes list --tag vegetarian   # list recipes with a tag
 recipes tags               # list every tag and how many recipes use it
 ```
 
-Each recipe has a tags line under its title, such as `Tags: indian, main, vegetarian, one-pot`. Tags cover cuisine, type of dish (main, side, soup), diet (vegetarian, meat), and practical notes (quick, one-pot, make-ahead).
+Each recipe has a tags line under its title, such as `Tags: indian, main, vegetarian, one-pot`. Tags cover cuisine, type of dish (main, side, soup, salad, dressing), diet (vegetarian, meat), and practical notes (quick, one-pot, make-ahead). Optional `Serves: 4` and `Time: 45 min` lines can follow the tags line; the website shows them and uses the serving count to scale amounts.
 
 Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-list menu with a preview.
 
@@ -61,10 +61,18 @@ Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-
 
 On the site you can:
 
+- switch between the **Recipes** and **Salads** tabs. Salads has two sections, Salads and Dressings.
 - search by dish or ingredient, and sort A–Z or newest first
-- tap a tag, such as vegetarian or quick, to show only those recipes (tags also appear under each recipe's title)
+- tap a tag, such as vegetarian or quick, to show only those recipes (tags also appear under each recipe's title, and tapping one there opens the filtered list)
+- tap **Save** on a recipe, then tap **Saved** on the home page to see only your saved recipes
+- change the servings with **−** and **+** to scale the ingredient amounts
+- tap a time in a step, such as "12–15 minutes", to start a timer. Timers keep running while you move between pages, and beep and vibrate when they finish.
+- tap **Add to shopping list** to collect ingredients from several recipes at `/list`, cross them off in the shop, and share or copy the list
 - tap an ingredient or step to cross it off (each recipe remembers this until you tap Clear)
-- tap the **A A** button to make the text bigger
+- tap **Print** for a clean printed page, or the **A A** button to make the text bigger
+- see "Used in" on a dressing, which lists the salads that link to it
+
+Saved recipes, the shopping list, and timers are stored in the browser on each device.
 
 Pages are built from the Markdown files each time they load, so edits show up on refresh. The site uses only Python, with nothing to install. Its code is in `site/`.
 

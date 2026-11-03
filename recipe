@@ -10,6 +10,7 @@
 #   recipe list --tag <tag> list recipes with a tag (e.g. vegetarian)
 #   recipe tags             list every tag and how many recipes use it
 #   recipe serve            show the recipes as a website (for your phone)
+#   recipe build            build the website as plain files in _site/
 #   recipe photos [name]    make photos for recipes that have none (OpenAI)
 
 set -euo pipefail
@@ -159,6 +160,9 @@ case "${1:-}" in
   serve|web)
     shift; exec python3 "$DIR/site/serve.py" "$@"
     ;;
+  build)
+    shift; exec python3 "$DIR/site/build.py" "$@"
+    ;;
   photos|images)
     shift; exec python3 "$DIR/site/thumbnails.py" "$@"
     ;;
@@ -174,7 +178,7 @@ case "${1:-}" in
     grep -ril --include='*.md' --exclude='README.md' --exclude='AGENTS.md' --exclude='CLAUDE.md' -- "$*" "$DIR" | xargs -n1 basename 2>/dev/null | sed 's/\.md$//' | sort
     ;;
   -h|--help|help)
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     ;;
   *)
     name="$(find_recipe "$@")" && show "$name"

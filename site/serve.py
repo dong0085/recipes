@@ -9,6 +9,8 @@ up on refresh. Uses only the Python standard library.
 """
 
 import argparse
+import functools
+import hashlib
 import html
 import mimetypes
 import re
@@ -24,6 +26,26 @@ ROOT = SITE.parent
 IMAGES = ROOT / "images"
 STATIC = SITE / "static"
 DOCS = {"README.md", "AGENTS.md", "CLAUDE.md"}  # Markdown files that are docs, not recipes
+
+# Prefix for every link the pages write. Empty when serving here; build.py sets it to
+# "/recipes" for GitHub Pages, where the site lives at <user>.github.io/recipes/.
+BASE = ""
+
+
+def link(path):
+    """A site path such as "/r/lentil-soup", with BASE in front."""
+    return BASE + path
+
+
+def version(path):
+    """A short hash of a file's contents, for ?v= in its URL."""
+    stat = path.stat()
+    return _version(path, stat.st_mtime_ns, stat.st_size)
+
+
+@functools.lru_cache(maxsize=None)
+def _version(path, mtime, size):
+    return hashlib.md5(path.read_bytes()).hexdigest()[:8]
 
 # The tabs on the home page: slug -> (URL, title, sections). Each section is
 # (tag, heading, blurb). A recipe belongs to the first tab with a section matching
@@ -68,12 +90,12 @@ class Recipe:
         self.steps = len(re.findall(r"^\d+[.)]\s", self.text, re.M))
         image = IMAGES / f"{self.slug}.jpg"
         self.image = (
-            f"/images/{quote(image.name)}?v={int(image.stat().st_mtime)}" if image.exists() else None
+            link(f"/images/{quote(image.name)}?v={version(image)}") if image.exists() else None
         )
 
     @property
     def url(self):
-        return f"/r/{quote(self.slug)}"
+        return link(f"/r/{quote(self.slug)}")
 
     @property
     def body(self):
@@ -98,7 +120,7 @@ def tab_of(recipe):
 
 
 def tag_url(tag, tab="recipes"):
-    return f"{TABS[tab][0]}?tag={quote(tag)}"
+    return link(f"{TABS[tab][0]}?tag={quote(tag)}")
 
 
 def git_dates():
@@ -153,8 +175,13 @@ def inline(text):
     text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"(?<![\w*])\*(?!\s)(.+?)\*(?!\w)", r"<em>\1</em>", text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{site_link(m[2])}">{m[1]}</a>', text)
     return text
+
+
+def site_link(href):
+    """Links such as /r/apple-cider-vinaigrette point into the site, so they get BASE."""
+    return link(href) if href.startswith("/") and not href.startswith("//") else href
 
 
 LIST_ITEM = re.compile(r"^(\s*)(\d+)[.)]\s+(.*)$|^(\s*)[-*+]\s+(.*)$")
@@ -238,7 +265,7 @@ def day(d):
 
 def asset(name):
     path = STATIC / name
-    return f"/static/{name}?v={int(path.stat().st_mtime)}"
+    return link(f"/static/{name}?v={version(path)}")
 
 
 # Small line icons, drawn on a 20×20 grid with the current text colour.
@@ -275,7 +302,7 @@ def page(title, body, kind):
 <meta name="apple-mobile-web-app-title" content="Recipes">
 <link rel="icon" href="{asset('icon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{asset('icon-180.png')}">
-<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="manifest" href="{asset('manifest.webmanifest')}">
 <link rel="stylesheet" href="{asset('style.css')}">
 <title>{esc(title)}</title>
 <script>try{{var s=localStorage.getItem("text-size");if(s)document.documentElement.dataset.size=s}}catch(e){{}}</script>
@@ -296,7 +323,7 @@ def thumb(recipe, cls):
 
 def list_link(cls):
     """The shopping list link; app.js fills in the count."""
-    return (f'<a class="{cls}" href="/list">{icon("list")}<span>Shopping list</span>'
+    return (f'<a class="{cls}" href="{link("/list")}">{icon("list")}<span>Shopping list</span>'
             f'<span class="count" data-list-count hidden></span></a>')
 
 
@@ -351,11 +378,11 @@ def index_page(all_recipes, tab="recipes", tag=""):
         current = ' aria-current="true"' if t == tag else ""
         return f'<a class="chip" href="{esc(href)}" data-tag="{esc(t)}"{current}>{esc(label)}</a>'
 
-    chips = [chip(url, "All", "")]
+    chips = [chip(link(url), "All", "")]
     chips.append(f'<button class="chip chip--saved" type="button" data-tag="saved" hidden>'
                  f'{icon("heart")}Saved</button>')
     chips += [chip(tag_url(t, tab), t, t) for t in sorted(counts, key=lambda t: (-counts[t], t))]
-    tag_bar = f'<nav class="tagbar" aria-label="Tags" data-base="{esc(url)}">{"".join(chips)}</nav>'
+    tag_bar = f'<nav class="tagbar" aria-label="Tags" data-base="{esc(link(url))}">{"".join(chips)}</nav>'
 
     shown = sum(1 for r in members if not tag or tag in r.tags)
     empty_hidden = "" if not shown else " hidden"
@@ -364,7 +391,7 @@ def index_page(all_recipes, tab="recipes", tag=""):
     for slug, (t_url, t_title, _) in TABS.items():
         n = sum(1 for r in all_recipes if r.tab == slug)
         current = ' aria-current="page"' if slug == tab else ""
-        tabs.append(f'<a href="{t_url}"{current}>{esc(t_title)}<span class="tabs__count">{n}</span></a>')
+        tabs.append(f'<a href="{link(t_url)}"{current}>{esc(t_title)}<span class="tabs__count">{n}</span></a>')
 
     since = min((r.added for r in all_recipes), default=date.today())
     count = len(all_recipes)
@@ -459,8 +486,8 @@ def recipe_page(recipe, all_recipes):
             source = f'<p class="recipe-head__source">Source: {esc(recipe.source)}</p>'
 
     # "Used in": other recipes that link here, such as a salad that uses this dressing.
-    link = f"/r/{recipe.slug})"
-    used_in = [r for r in all_recipes if r is not recipe and link in r.text]
+    target = f"/r/{recipe.slug})"
+    used_in = [r for r in all_recipes if r is not recipe and target in r.text]
     used_html = ""
     if used_in:
         links = "".join(f'<li><a href="{r.url}">{thumb(r, "mini__img")}<span>{esc(r.title)}</span></a></li>' for r in used_in)
@@ -474,7 +501,7 @@ def recipe_page(recipe, all_recipes):
 
     back_label = "Archive" if recipe.tab == "recipes" else tab_title
     section = "" if recipe.tab == "recipes" else f" · {esc(tab_title)}"
-    body = f"""{topbar(tab_url, back_label)}
+    body = f"""{topbar(link(tab_url), back_label)}
 
 <main class="read">
 {hero}
@@ -515,7 +542,7 @@ def recipe_page(recipe, all_recipes):
 
 
 def list_page():
-    body = f"""{topbar("/", "Archive")}
+    body = f"""{topbar(link("/"), "Archive")}
 
 <main class="read">
 <header class="recipe-head">
@@ -538,10 +565,10 @@ def list_page():
 
 
 def not_found_page():
-    body = """<div class="wrap"><header class="masthead">
+    body = f"""<div class="wrap"><header class="masthead">
   <p class="eyebrow">Not in the archive</p>
   <h1 class="masthead__title">Recipe not found</h1>
-  <p class="masthead__meta"><a href="/">Back to all recipes</a></p>
+  <p class="masthead__meta"><a href="{link("/")}">Back to all recipes</a></p>
 </header></div>"""
     return page("Not found", body, "missing")
 

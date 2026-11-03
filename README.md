@@ -76,6 +76,17 @@ Saved recipes, the shopping list, and timers are stored in the browser on each d
 
 Pages are built from the Markdown files each time they load, so edits show up on refresh. The site uses only Python, with nothing to install. Its code is in `site/`.
 
+### Published copy
+
+The site is also published at <https://dong0085.github.io/recipes/>. Every push to `main` rebuilds it with GitHub Actions (`.github/workflows/pages.yml`), so a new recipe goes live about a minute after you push it. Saved recipes, lists, and timers there are separate from the ones on the home Wi-Fi copy.
+
+To build the same files yourself:
+
+```sh
+recipes build              # writes plain HTML to _site/ (links start with /recipes)
+recipes build --base ""    # for a site at the root of a domain
+```
+
 ## Photos
 
 Each recipe has a photo in `images/<recipe>.jpg`, made with the OpenAI image API (`gpt-image-2`). Every photo uses the same art direction, so they look like a set.

@@ -43,6 +43,7 @@ def build(out, base):
     for slug, (url, _, _) in serve.TABS.items():
         write(page_file(out, url), serve.index_page(recipes, slug))
     write(page_file(out, "/list"), serve.list_page())
+    write(page_file(out, "/changes"), serve.changes_page(recipes))
     write(out / "404.html", serve.not_found_page())
     for recipe in recipes:
         write(page_file(out, f"/r/{recipe.slug}"), serve.recipe_page(recipe, recipes))

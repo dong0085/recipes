@@ -55,6 +55,32 @@ Each recipe has a tags line under its title, such as `Tags: indian, main, vegeta
 
 Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-list menu with a preview.
 
+## History
+
+Every recipe keeps a changelog, and nobody has to write it. The archive is a git repository: each saved change is a commit, and the history of a recipe is the list of commits that touched it. After you change recipes, one command saves them:
+
+```sh
+recipes save               # commit each changed recipe on its own, with a message written for you
+recipes save --push        # the same, then push so the website updates
+recipes save -n            # show what would be saved, without saving
+recipes save chili -m "Less cumin, more smoked paprika"   # one recipe, your own message
+```
+
+`save` names the recipe and the parts that changed, such as "Add Gazpacho", "Update Shakshuka: time, ingredients, and notes", or "New photo for Chili". A renamed recipe keeps its history.
+
+To read the history:
+
+```sh
+recipes diff               # what has changed since the last save
+recipes log                # recent changes across the archive
+recipes log chana          # one recipe: date, the parts that changed, and the message
+recipes log chana -p       # the same, with every edit word by word
+```
+
+On the website, each recipe that has changed since it was added has a **History** section at the bottom. Each entry gives the date and the parts that changed, such as Time or Ingredients. Tap **What changed** to see the edited lines, with the changed words marked. Edits on your computer that are not saved yet show at the top. `/changes` lists every change in the archive, newest first.
+
+Plain `git commit` works too: the history comes from the commits themselves, so the site shows what changed even when a commit message is short or covers several recipes.
+
 ## Website
 
 `recipes serve` shows the archive as a website, so you can read recipes on your phone in the kitchen. It prints an address like `http://10.0.0.160:8000`. Open it on a phone on the same Wi-Fi. In Safari, tap Share → Add to Home Screen to get an app icon.
@@ -71,6 +97,7 @@ On the site you can:
 - tap an ingredient or step to cross it off (each recipe remembers this until you tap Clear)
 - tap **Print** for a clean printed page, or the **A A** button to make the text bigger
 - see "Used in" on a dressing, which lists the salads that link to it
+- read a recipe's **History** to see what changed and when, or open `/changes` for the whole archive
 
 Saved recipes, the shopping list, and timers are stored in the browser on each device.
 

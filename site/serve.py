@@ -15,11 +15,12 @@ import html
 import mimetypes
 import re
 import socket
-import subprocess
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
+
+import history
 
 SITE = Path(__file__).resolve().parent
 ROOT = SITE.parent
@@ -124,19 +125,22 @@ def tag_url(tag, tab="recipes"):
 
 
 def git_dates():
-    """Map file name -> (first commit date, last commit date) from git history."""
-    try:
-        log = subprocess.run(
-            ["git", "-C", str(ROOT), "log", "--format=%x00%as", "--name-only", "--", "*.md"],
-            capture_output=True, text=True, check=True,
-        ).stdout
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return {}
+    """Map file name -> (first commit date, last commit date) from git history.
+
+    A renamed recipe keeps the dates of its old name, so it keeps its number too.
+    """
+    log = history.git("log", "--reverse", "-M", "--format=%x00%as", "--name-status", "--", "*.md")
     dates = {}
     for chunk in log.split("\x00")[1:]:
         lines = chunk.strip().splitlines()
         day = date.fromisoformat(lines[0])
-        for name in lines[1:]:
+        for line in lines[1:]:
+            status, *paths = line.split("\t")
+            if not paths:
+                continue
+            name = paths[-1]
+            if status.startswith("R") and paths[0] in dates:
+                dates[name] = dates.pop(paths[0])
             first, last = dates.get(name, (day, day))
             dates[name] = (min(first, day), max(last, day))
     return dates
@@ -423,7 +427,7 @@ def index_page(all_recipes, tab="recipes", tag=""):
 {''.join(shelves)}
 <p class="empty"{empty_hidden}>Nothing here matches that.</p>
 
-<footer class="colophon">Kept in plain text. Served from the kitchen.</footer>
+<footer class="colophon">Kept in plain text. Served from the kitchen. <a href="{link("/changes")}">Every change, from the start</a></footer>
 </div>"""
     title = "Recipes" if tab == "recipes" else f"{tab_title} · Recipes"
     return page(title, body, "index")
@@ -448,9 +452,13 @@ def recipe_page(recipe, all_recipes):
     next_r = siblings[i + 1] if i + 1 < len(siblings) else None
     tab_url, tab_title, _ = TABS[recipe.tab]
 
+    changes = history.recipe_history(recipe.slug)
     dates = f"Added {day(recipe.added)}"
     if recipe.revised != recipe.added:
         dates += f" · Revised {day(recipe.revised)}"
+    if len(changes) > 1:
+        dates += f' · <a href="#history">{len(changes) - 1} change{"s" if len(changes) > 2 else ""}</a>'
+    history_html = history_section(changes)
     tags = "".join(f'<a class="chip" href="{esc(tag_url(t, recipe.tab))}">{esc(t)}</a>' for t in recipe.tags)
     tags = f'<p class="recipe-head__tags">{tags}</p>' if tags else ""
 
@@ -533,6 +541,8 @@ def recipe_page(recipe, all_recipes):
 
 {used_html}
 
+{history_html}
+
 <nav class="pager">
   {pager(prev_r, "Previous", "pager__link--prev")}
   {pager(next_r, "Next", "pager__link--next")}
@@ -564,6 +574,134 @@ def list_page():
     return page("Shopping list · Recipes", body, "list")
 
 
+# ------------------------------------------------------------------ history
+
+PART_NAMES = {"title": "Title", "tags": "Tags", "serves": "Serves", "time": "Time",
+              "source": "Source", "photo": "Photo", "new recipe": "New recipe"}
+
+
+def part_names(parts):
+    return ", ".join(PART_NAMES.get(p, p) for p in parts)
+
+
+def diff_rows(change):
+    """The changed lines of one change, grouped by the part of the recipe they are in."""
+    out, shown = [], 0
+    total = sum(len(b.rows) for b in change.blocks)
+    last_part = None
+    for block in change.blocks:
+        if shown >= history.MAX_LINES:
+            break
+        if block.part != last_part:
+            out.append(f'<p class="diff__part">{esc(PART_NAMES.get(block.part, block.part))}</p>')
+            last_part = block.part
+        for kind, content in block.rows:
+            if shown >= history.MAX_LINES:
+                break
+            shown += 1
+            if kind == "mod":
+                tags = {"del": "del", "add": "ins"}
+                words = "".join(
+                    f"<{tags[op]}>{esc(text)}</{tags[op]}>" if op in tags else esc(text)
+                    for op, text in content)
+                out.append(f'<p class="diff__line diff__line--mod">{words}</p>')
+            else:
+                tag = "del" if kind == "del" else "ins"
+                out.append(f'<p class="diff__line diff__line--{kind}"><{tag}>{esc(content)}</{tag}></p>')
+    if total > shown:
+        more = total - shown
+        out.append(f'<p class="diff__more">and {more} more line{"s" if more != 1 else ""}</p>')
+    return "".join(out)
+
+
+def change_item(change, show_author):
+    if change.kind == "unsaved":
+        when = '<span class="change__date change__date--unsaved">Not saved yet</span>'
+    else:
+        when = f'<time class="change__date" datetime="{change.day.isoformat()}">{day(change.day)}</time>'
+
+    if change.kind == "added":
+        what = "Added"
+    elif change.kind == "renamed":
+        what = f"Renamed from {change.renamed_from}" + (f" · {part_names(change.parts)}" if change.parts else "")
+    else:
+        what = part_names(change.parts) or "No visible change"
+
+    if change.kind == "unsaved":
+        message = "Edited on this computer. Run <code>recipe save</code> to add it to the history."
+    else:
+        message = esc(change.subject)
+        if show_author and change.author:
+            message += f' <span class="change__author">{esc(change.author)}</span>'
+
+    diff = ""
+    if change.blocks and change.kind != "added":
+        stat = f'<span class="change__stat"><ins>+{change.plus}</ins> <del>−{change.minus}</del></span>'
+        diff = (f'<details class="change__diff"><summary>What changed {stat}</summary>'
+                f'<div class="diff">{diff_rows(change)}</div></details>')
+
+    return f"""<li class="change">
+  <p class="change__head">{when}<span class="change__what">{esc(what)}</span></p>
+  <p class="change__msg">{message}</p>
+  {diff}
+</li>"""
+
+
+def history_section(changes):
+    """The recipe's changelog. Hidden when the only entry is the day it was added."""
+    if len(changes) < 2:
+        return ""
+    show_author = len({c.author for c in changes if c.author}) > 1
+    items = "".join(change_item(c, show_author) for c in changes)
+    return f"""<section class="history" id="history">
+  <h2 class="eyebrow">History</h2>
+  <ol class="history__list">{items}</ol>
+  <p class="history__all"><a href="{link("/changes")}">Every change in the archive</a></p>
+</section>"""
+
+
+def changes_page(all_recipes):
+    by_slug = {r.slug: r for r in all_recipes}
+    commits = history.archive_log(DOCS)
+    show_author = len({c.author for c in commits}) > 1
+
+    def name(slug):
+        r = by_slug.get(slug)
+        if r:
+            return f'<a href="{r.url}#history">{esc(r.title)}</a>'
+        return f'<span class="gone">{esc(slug.replace("-", " ").title())}</span>'
+
+    items = []
+    for c in commits:
+        rows = []
+        for slug, verbs in c.recipes.items():
+            words = [f"renamed from {c.renamed[slug]}" if v == "renamed" else v for v in verbs]
+            rows.append(f'<li>{name(slug)} <span class="change__verb">{esc(", ".join(words))}</span></li>')
+        author = f' <span class="change__author">{esc(c.author)}</span>' if show_author else ""
+        items.append(f"""<li class="change">
+  <p class="change__head"><time class="change__date" datetime="{c.day.isoformat()}">{day(c.day)}</time></p>
+  <p class="change__msg">{esc(c.subject)}{author}</p>
+  <ul class="change__recipes">{"".join(rows)}</ul>
+</li>""")
+
+    if items:
+        listing = f'<ol class="history__list">{"".join(items)}</ol>'
+    else:
+        listing = '<p class="empty">No history yet. Run <code>recipe save</code> after you change a recipe.</p>'
+    body = f"""{topbar(link("/"), "Archive")}
+
+<main class="read">
+<header class="recipe-head">
+  <p class="eyebrow">Changelog</p>
+  <h1 class="recipe-head__title">Every change</h1>
+  <p class="recipe-head__meta">Newest first, straight from the archive's git history.</p>
+</header>
+
+<section class="history history--archive">{listing}</section>
+</main>"""
+    return page("Changes · Recipes", body, "changes")
+
+
 def not_found_page():
     body = f"""<div class="wrap"><header class="masthead">
   <p class="eyebrow">Not in the archive</p>
@@ -589,6 +727,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if url == "/list":
             return self.send_html(200, list_page())
+
+        if url == "/changes":
+            return self.send_html(200, changes_page(load_recipes()))
 
         if url.startswith("/r/"):
             all_recipes = load_recipes()

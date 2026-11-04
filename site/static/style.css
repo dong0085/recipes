@@ -898,6 +898,153 @@ button { font: inherit; color: inherit; }
   color: var(--accent);
 }
 
+/* ---------------------------------------------------------------- history */
+
+/* A recipe's changelog, read from git: one entry per commit, newest first.
+   Also the /changes page, which lists the whole archive the same way. */
+.history { margin-top: var(--s7); }
+.history__list {
+  list-style: none;
+  margin: var(--s3) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.change {
+  padding: var(--s4) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.change__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s3);
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.change__date { color: var(--ink-soft); }
+.change__date--unsaved { color: var(--accent); }
+.change__msg {
+  margin: var(--s1) 0 0;
+  font-family: var(--serif);
+  font-size: var(--text-md);
+  line-height: 1.45;
+}
+.change__msg code { font-family: ui-monospace, Menlo, monospace; font-size: .88em; }
+.change__author { font-style: italic; color: var(--muted); white-space: nowrap; }
+.change__author::before { content: "— "; }
+
+.change__diff { margin-top: var(--s2); }
+.change__diff > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 32px;
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  list-style: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.change__diff > summary::-webkit-details-marker { display: none; }
+.change__diff > summary::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform .15s var(--ease);
+}
+.change__diff[open] > summary::before { transform: rotate(45deg); }
+.change__stat { color: var(--muted); font-variant-numeric: tabular-nums; }
+.change__stat ins, .change__stat del { text-decoration: none; }
+
+.diff {
+  margin-top: var(--s1);
+  padding: var(--s3) var(--s3) var(--s3) var(--s2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  font-family: var(--serif);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.diff__part {
+  margin: var(--s3) 0 var(--s1) var(--s4);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.diff__part:first-child { margin-top: 0; }
+.diff__line {
+  position: relative;
+  margin: 2px 0;
+  padding-left: var(--s4);
+  white-space: pre-wrap;
+}
+.diff__line::before {
+  position: absolute;
+  left: 2px;
+  font-family: var(--sans);
+  color: var(--muted);
+}
+.diff__line--add::before { content: "+"; color: var(--accent); }
+.diff__line--del::before { content: "\2212"; }
+.diff__line--mod::before { content: "~"; color: var(--accent); }
+.diff ins {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--accent-wash);
+  text-decoration: none;
+}
+.diff__line--add ins { padding: 0; background: none; }
+.diff del {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.diff__more { margin: var(--s2) 0 0 var(--s4); font-style: italic; color: var(--muted); }
+
+.history__all {
+  margin: var(--s3) 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.history--archive { margin-top: var(--s5); }
+.history--archive .history__list { margin-top: 0; }
+.change__recipes {
+  list-style: none;
+  margin: var(--s2) 0 0;
+  padding: 0;
+  font-family: var(--serif);
+  font-size: var(--text-md);
+}
+.change__recipes li { padding: 2px 0; }
+.change__verb {
+  margin-left: var(--s1);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gone { color: var(--muted); }
+
+.colophon a { display: block; margin-top: var(--s2); }
+
 /* ---------------------------------------------------------------- timer dock */
 
 /* Leave room at the bottom so the dock never covers the last lines. */
@@ -1017,7 +1164,7 @@ body:has(.dock:not([hidden])) { padding-bottom: calc(var(--s8) * 1.5 + env(safe-
 
 @media print {
   .topbar, .progress, .pager, .toolbar, .tagbar, .tabs, .colophon, .actions, .dock,
-  .stepper, .related, .facts__note, .masthead__list { display: none !important; }
+  .stepper, .related, .history, .facts__note, .masthead__list { display: none !important; }
   body, html { background: #fff; color: #000; }
   .read { max-width: none; padding: 0; }
   .hero img { max-height: 3in; width: auto; border-radius: 0; }

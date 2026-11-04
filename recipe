@@ -12,6 +12,9 @@
 #   recipe serve            show the recipes as a website (for your phone)
 #   recipe build            build the website as plain files in _site/
 #   recipe photos [name]    make photos for recipes that have none (OpenAI)
+#   recipe save [name]      commit each changed recipe on its own (git), --push to publish
+#   recipe log [name]       a recipe's changelog, or recent changes to the archive; -p shows edits
+#   recipe diff [name]      what has changed since the last save
 
 set -euo pipefail
 
@@ -91,6 +94,59 @@ find_recipe() {
   fi
 }
 
+# The archive's recipe files for git: every top-level .md file except the docs.
+RECIPE_FILES=(':(top,glob)*.md' ':(top,exclude)README.md' ':(top,exclude)AGENTS.md' ':(top,exclude)CLAUDE.md')
+
+# After an edit, point at `recipe save` so the change lands in the recipe's history.
+remind_save() {
+  if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1 \
+     && [[ -n "$(git -C "$DIR" status --porcelain -- "$1.md")" ]]; then
+    echo "Changed $1. Run 'recipe save' to add it to the history." >&2
+  fi
+}
+
+recipe_log() {
+  local patch="" args=() a
+  for a in "$@"; do
+    case "$a" in
+      -p|--patch|--diff) patch=1 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  if [[ ${#args[@]} -eq 0 ]]; then
+    python3 "$DIR/site/history.py" log
+    return
+  fi
+  local name
+  name="$(find_recipe "${args[@]}")" || return 1
+  if [[ -n "$patch" ]]; then
+    git -C "$DIR" log --follow --date=short --format='%C(yellow)%ad%C(reset)  %s  %C(dim)%an%C(reset)' \
+      -p --word-diff=color -- "$name.md"
+  else
+    python3 "$DIR/site/history.py" log "$name"
+  fi
+}
+
+recipe_diff() {
+  local new
+  if [[ $# -eq 0 ]]; then
+    git -C "$DIR" diff --word-diff=color HEAD -- "${RECIPE_FILES[@]}"
+    new="$(git -C "$DIR" -c core.quotepath=false ls-files --others --exclude-standard -- "${RECIPE_FILES[@]}")"
+    [[ -n "$new" ]] && { echo "New, not saved yet:"; echo "$new" | sed 's/\.md$//; s/^/  /'; }
+  else
+    local name
+    name="$(find_recipe "$@")" || return 1
+    if ! git -C "$DIR" ls-files --error-unmatch -- "$name.md" >/dev/null 2>&1; then
+      echo "$name is new and not saved yet. Run 'recipe save' to add it."
+    elif git -C "$DIR" diff --quiet HEAD -- "$name.md"; then
+      echo "No changes to $name since the last save."
+    else
+      git -C "$DIR" diff --word-diff=color HEAD -- "$name.md"
+    fi
+  fi
+  return 0
+}
+
 pick() {
   local preview="cat $DIR/{}.md"
   command -v glow >/dev/null && preview="glow -s $(theme) $DIR/{}.md"
@@ -126,6 +182,7 @@ Source:
 EOF
   fi
   "$EDITOR" "$file"
+  remind_save "$(basename "$file" .md)"
 }
 
 case "${1:-}" in
@@ -170,7 +227,16 @@ case "${1:-}" in
     shift; new_recipe "$@"
     ;;
   edit)
-    shift; name="$(find_recipe "$@")" && "$EDITOR" "$DIR/$name.md"
+    shift; name="$(find_recipe "$@")" && "$EDITOR" "$DIR/$name.md" && remind_save "$name"
+    ;;
+  save|commit)
+    shift; exec python3 "$DIR/site/history.py" save "$@"
+    ;;
+  log|history)
+    shift; recipe_log "$@"
+    ;;
+  diff|changes)
+    shift; recipe_diff "$@"
     ;;
   search|find)
     shift
@@ -178,7 +244,7 @@ case "${1:-}" in
     grep -ril --include='*.md' --exclude='README.md' --exclude='AGENTS.md' --exclude='CLAUDE.md' -- "$*" "$DIR" | xargs -n1 basename 2>/dev/null | sed 's/\.md$//' | sort
     ;;
   -h|--help|help)
-    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     ;;
   *)
     name="$(find_recipe "$@")" && show "$name"

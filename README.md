@@ -1,6 +1,6 @@
 # Recipes
 
-My recipe archive. Each recipe is a Markdown file, and the `recipe` script finds and shows them in the terminal. `recipes serve` also shows them as a website for reading on a phone in the kitchen.
+My recipe archive. Each recipe is a Markdown file, and the `recipe` script finds and shows them in the terminal. `recipes serve` also shows them as a website for reading on a phone in the kitchen. Git keeps each recipe's history, so you can always see what changed in a recipe and when.
 
 <table>
   <tr>
@@ -55,6 +55,14 @@ Each recipe has a tags line under its title, such as `Tags: indian, main, vegeta
 
 Inside the recipes folder, `./recipe` with nothing after it opens a pick-from-a-list menu with a preview.
 
+Adding or changing a recipe, from start to finish:
+
+```sh
+recipes new Chicken Curry  # write it (or: recipes edit curry)
+recipes photos             # make a photo for any recipe that has none
+recipes save --push        # add it to the history and publish the website
+```
+
 ## History
 
 Every recipe keeps a changelog, and nobody has to write it. The archive is a git repository: each saved change is a commit, and the history of a recipe is the list of commits that touched it. After you change recipes, one command saves them:
@@ -66,7 +74,9 @@ recipes save -n            # show what would be saved, without saving
 recipes save chili -m "Less cumin, more smoked paprika"   # one recipe, your own message
 ```
 
-`save` names the recipe and the parts that changed, such as "Add Gazpacho", "Update Shakshuka: time, ingredients, and notes", or "New photo for Chili". A renamed recipe keeps its history.
+`save` names the recipe and the parts that changed, such as "Add Gazpacho", "Update Shakshuka: time, ingredients, and notes", or "New photo for Chili". It only commits recipe files and their photos, so other work in the folder stays as it is. After `recipes edit` or `recipes new`, the script reminds you to save.
+
+A renamed recipe keeps its history, its number, and its "Added" date. `save` spots a rename when a deleted recipe and a new one have nearly the same text. If you rename by hand, use `git mv`.
 
 To read the history:
 
@@ -79,7 +89,7 @@ recipes log chana -p       # the same, with every edit word by word
 
 On the website, each recipe that has changed since it was added has a **History** section at the bottom. Each entry gives the date and the parts that changed, such as Time or Ingredients. Tap **What changed** to see the edited lines, with the changed words marked. Edits on your computer that are not saved yet show at the top. `/changes` lists every change in the archive, newest first.
 
-Plain `git commit` works too: the history comes from the commits themselves, so the site shows what changed even when a commit message is short or covers several recipes.
+Plain `git commit` works too: the history comes from the commits themselves, so the site shows what changed even when a commit message is short or covers several recipes. Without git (for example, a copy of the folder), everything else still works and the History sections are left out.
 
 ## Website
 
@@ -105,7 +115,7 @@ Pages are built from the Markdown files each time they load, so edits show up on
 
 ### Published copy
 
-The site is also published at <https://dong0085.github.io/recipes/>. Every push to `main` rebuilds it with GitHub Actions (`.github/workflows/pages.yml`), so a new recipe goes live about a minute after you push it. Saved recipes, lists, and timers there are separate from the ones on the home Wi-Fi copy.
+The site is also published at <https://dong0085.github.io/recipes/>. Every push to `main` rebuilds it with GitHub Actions (`.github/workflows/pages.yml`), so a new recipe goes live about a minute after you push it (`recipes save --push` does both). The workflow fetches the full git history, so the published pages show each recipe's History too. Saved recipes, lists, and timers there are separate from the ones on the home Wi-Fi copy.
 
 To build the same files yourself:
 
